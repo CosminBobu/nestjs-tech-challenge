@@ -13,6 +13,7 @@ This repository contains a NestJS monorepo with two applications:
 
 ## API Endpoints
 - `POST /auth/register` — register a new user.
+- `POST /auth/login` — login for the user(it returns a valid JWT).
 - `GET /auth/users` — list all users (cached with Nest CacheModule).
 - `GET /health/live` — liveness probe for gateway process.
 - `GET /health/ready` — readiness probe (checks TCP connectivity to authentication service).
@@ -47,7 +48,7 @@ MONGO_URI=mongodb://localhost:27017/auth
 CACHE_TTL_SECONDS=20
 RATE_LIMIT_TTL_SECONDS=60
 RATE_LIMIT_MAX_REQUESTS=30
-JWT_SECRET=super-secret-jwt-key-change-this-value
+JWT_SECRET=SCtui9fcCaqmziuQf1SkFJ3fI8fdH3dNzusSEIVTKIA=
 JWT_EXPIRES_IN=1h
 ```
 
@@ -76,12 +77,6 @@ docker compose up --build
 ```
 # Run all tests
 npm test
-
-# Run only auth tests
-npm run test:auth
-
-# Run only gateway tests
-npm run test:gateway
 ```
 
 ## Notes

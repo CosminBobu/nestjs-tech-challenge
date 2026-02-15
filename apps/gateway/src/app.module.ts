@@ -23,7 +23,7 @@ import { RateLimitGuard } from './rate-limit/rate-limit.guard';
       isGlobal: true,
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        ttl: Number(configService.get('CACHE_TTL_SECONDS'))
+        ttl: Number(configService.get('CACHE_TTL_SECONDS')) * 1000
       })
     }),
     ClientsModule.registerAsync([

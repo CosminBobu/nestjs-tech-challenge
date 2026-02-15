@@ -3,14 +3,10 @@ import {
   ExecutionContext,
   HttpException,
   HttpStatus,
-  Inject,
-  Injectable,
-  
+  Injectable
 } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { Cache } from 'cache-manager';
 import {
   RATE_LIMIT_OPTIONS_METADATA_KEY,
   RateLimitOptions,
@@ -41,8 +37,7 @@ export class RateLimitGuard implements CanActivate {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly reflector: Reflector,
-    @Inject(CACHE_MANAGER) private readonly cacheManager: Cache
+    private readonly reflector: Reflector
   ) {
     this.defaultTtlSeconds = Number(this.configService.get('RATE_LIMIT_TTL_SECONDS') ?? 60);
     this.defaultMaxRequests = Number(this.configService.get('RATE_LIMIT_MAX_REQUESTS') ?? 30);
@@ -66,17 +61,23 @@ export class RateLimitGuard implements CanActivate {
     const ttlSeconds = options?.ttlSeconds ?? this.defaultTtlSeconds;
     const maxRequests = options?.maxRequests ?? this.defaultMaxRequests;
 
-    const request = context.switchToHttp().getRequest<HttpRequestLike & { body?: { email?: string } }>();
-    const response = context.switchToHttp().getResponse<{ setHeader: (name: string, value: string) => void }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<HttpRequestLike & { body?: { email?: string } }>();
+    const response = context
+      .switchToHttp()
+      .getResponse<{ setHeader: (name: string, value: string) => void }>();
 
     const forwardedFor = request.headers?.['x-forwarded-for'];
     const forwardedValue = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
     const forwardedIp = forwardedValue?.split(',')[0]?.trim();
+
     const identifier = forwardedIp ?? request.ip ?? request.socket?.remoteAddress ?? 'unknown';
     const path = request.originalUrl ?? request.path ?? 'unknown';
     const method = request.method ?? 'GET';
+
     const email = request.body?.email?.trim().toLowerCase();
-    const useEmailBucket = AUTH_ROUTES_WITH_EMAIL_BUCKET.some((route) => path.includes(route)) && email;
+    const useEmailBucket = AUTH_ROUTES_WITH_EMAIL_BUCKET.some((route) => path.includes(route)) && !!email;
 
     const key = useEmailBucket
       ? `rate-limit:auth:${email}:${method}:${path}`
@@ -84,19 +85,14 @@ export class RateLimitGuard implements CanActivate {
 
     const now = Date.now();
     const localEntry = this.localStore.get(key) ?? null;
-    const cacheEntry = (await this.cacheManager.get<RateLimitEntry>(key)) ?? null;
-    const cached =
-      localEntry && localEntry.resetAt > now
-        ? localEntry
-        : cacheEntry && cacheEntry.resetAt > now
-          ? cacheEntry
-          : null;
+
+    const cached = localEntry && localEntry.resetAt > now ? localEntry : null;
+
     const windowEnd = now + ttlSeconds * 1000;
 
-    const entry: RateLimitEntry =
-      cached && cached.resetAt > now
-        ? { count: cached.count + 1, resetAt: cached.resetAt }
-        : { count: 1, resetAt: windowEnd };
+    const entry: RateLimitEntry = cached
+      ? { count: cached.count + 1, resetAt: cached.resetAt }
+      : { count: 1, resetAt: windowEnd };
 
     const remaining = Math.max(maxRequests - entry.count, 0);
 
@@ -105,12 +101,13 @@ export class RateLimitGuard implements CanActivate {
     response.setHeader('X-RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
 
     if (entry.count > maxRequests) {
-      throw new HttpException('Too many requests, please try again later.', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Too many requests, please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS
+      );
     }
 
-    const ttl = Math.max(Math.ceil((entry.resetAt - now) / 1000), 1);
     this.localStore.set(key, entry);
-    await this.cacheManager.set(key, entry,  ttl );
 
     return true;
   }
